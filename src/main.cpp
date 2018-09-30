@@ -1,3 +1,10 @@
+/*
+Code is based on the the ABP example of the arduino-lmic library
+which is licensed under the MIT license
+Copyright (c) 2015 Thomas Telkamp and Matthijs Kooijman
+https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/ttn-abp.ino
+*/
+
 #include <lmic.h>
 #include <hal/hal.h>
 #include <Wire.h>
