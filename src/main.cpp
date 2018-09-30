@@ -7,12 +7,11 @@
 #include "LowPower.h"
 
 
-#include <Credentials.h>
+#include <Credentials.h> // TODO
 
-#define DEBUG
+#define DEBUG // toggle serial output
 
-
-Adafruit_BME280 bme; // I2C
+Adafruit_BME280 bme; // I2C, depending on your BME, you have to use address 0x77 (default) or 0x76, see below
 
 void os_getArtEui (u1_t* buf) { }
 void os_getDevEui (u1_t* buf) { }
@@ -20,7 +19,8 @@ void os_getDevKey (u1_t* buf) { }
 
 static osjob_t sendjob;
 
-const unsigned TX_INTERVAL = 30;
+const unsigned TX_INTERVAL = 900; // in seconds
+const int SLEEP_CYCLES = (int) (TX_INTERVAL / 8);
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -30,6 +30,24 @@ const lmic_pinmap lmic_pins = {
         .dio = {4, 5, 6}, // TTN Ulm Minster node {4, 5 ,6}
 };
 
+void printValues() {
+    Serial.print("Temperature = ");
+    Serial.print(bme.readTemperature());
+    Serial.println(" *C");
+
+    Serial.print("Pressure = ");
+
+    Serial.print(bme.readPressure());
+    Serial.println(" hPa");
+
+    Serial.print("Humidity = ");
+    Serial.print(bme.readHumidity());
+    Serial.println(" %");
+
+    Serial.println();
+}
+
+
 void do_send(osjob_t* j){
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
@@ -37,14 +55,18 @@ void do_send(osjob_t* j){
         Serial.println(F("OP_TXRXPEND, not sending"));
       #endif
     } else {
-        // temp > 2 byte
-        // pressure > 2 byte
-        // humidity > 2 by
-        // sum > 6 byte
+        // temp -> 2 byte
+        // pressure -> 2 byte
+        // humidity -> 2 byte
+        // sum -> 6 byte
         byte payload[6];
 
         // Only needed in forced mode. Force update of BME values
         bme.takeForcedMeasurement();
+
+        #ifdef DEBUG
+          printValues();
+        #endif
 
         // temp
         int temp = round(bme.readTemperature() * 100);
@@ -110,18 +132,19 @@ void onEvent (ev_t ev) {
                 Serial.println(LMIC.dataLen);
                 Serial.println(F(" bytes of payload"));
             }
-            // Now preparing going into sleep mode. The LMIC library already
+
+            // Now preparing to go into sleep mode. The LMIC library already
             // powers down the RFM95, see
             // https://www.thethingsnetwork.org/forum/t/how-to-put-rfm95-to-sleep/9427
 
-            // Following Code is adadopted by
+            // Following code is adapted by
             // https://github.com/rocketscream/MiniUltraPro/blob/master/ttn-otaa-sleep.ino
 
             // Ensure all debugging messages are sent before sleep
             Serial.flush();
 
-            // Go To Sleep for 8 s
-            for(int i = 0; i < 2; i++) {
+            // Going into sleep for more than 8 s – any better idea?
+            for(int i = 0; i < SLEEP_CYCLES; i++) {
               LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
             }
 
@@ -156,7 +179,7 @@ void setup() {
     Serial.println(F("Starting"));
 
 
-    // Setup BME280
+    // Setup BME280, use address 0x77 (default) or 0x76
     if (!bme.begin(0x76)) {
       Serial.println("Could not find a valid BME280 sensor, check wiring!");
       while (1);
@@ -165,8 +188,8 @@ void setup() {
     // Set BME in force mode to reduce power consumption
     // force mode = measure, store results, and go into sleep mode
     // until next measurement, see
-    // -
-    // -
+    // - http://tinkerman.cat/low-power-weather-station-bme280-moteino/
+    // - https://github.com/adafruit/Adafruit_BME280_Library/blob/master/examples/advancedsettings/advancedsettings.ino
     bme.setSampling(Adafruit_BME280::MODE_FORCED,
                     Adafruit_BME280::SAMPLING_X1, // temperature
                     Adafruit_BME280::SAMPLING_X1, // pressure
@@ -219,20 +242,3 @@ void setup() {
 void loop() {
     os_runloop_once();
 }
-
-/*void printValues() {
-    Serial.print("Temperature = ");
-    Serial.print(bme.readTemperature());
-    Serial.println(" *C");
-
-    Serial.print("Pressure = ");
-
-    Serial.print(bme.readPressure());
-    Serial.println(" hPa");
-
-    Serial.print("Humidity = ");
-    Serial.print(bme.readHumidity());
-    Serial.println(" %");
-
-    Serial.println();
-}*/
