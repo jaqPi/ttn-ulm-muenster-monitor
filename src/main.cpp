@@ -9,7 +9,16 @@
 
 #include <Credentials.h> // TODO
 
-#define DEBUG // toggle serial output
+//#define DEBUG // toggle serial output
+
+
+#ifdef DEBUG
+  #define log(x) Serial.print(x);
+  #define logln(x) Serial.println(x);
+#else
+  #define log(x)
+  #define logln(x)
+#endif
 
 Adafruit_BME280 bme; // I2C, depending on your BME, you have to use address 0x77 (default) or 0x76, see below
 
@@ -31,29 +40,27 @@ const lmic_pinmap lmic_pins = {
 };
 
 void printValues() {
-    Serial.print("Temperature = ");
-    Serial.print(bme.readTemperature());
-    Serial.println(" *C");
+    log("Temperature = ");
+    log(bme.readTemperature());
+    logln(" *C");
 
-    Serial.print("Pressure = ");
+    log("Pressure = ");
 
-    Serial.print(bme.readPressure());
-    Serial.println(" hPa");
+    log(bme.readPressure());
+    logln(" hPa");
 
-    Serial.print("Humidity = ");
-    Serial.print(bme.readHumidity());
-    Serial.println(" %");
+    log("Humidity = ");
+    log(bme.readHumidity());
+    logln(" %");
 
-    Serial.println();
+    logln();
 }
 
 
 void do_send(osjob_t* j){
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
-      #ifdef DEBUG
-        Serial.println(F("OP_TXRXPEND, not sending"));
-      #endif
+      logln(F("OP_TXRXPEND, not sending"));
     } else {
         // temp -> 2 byte
         // pressure -> 2 byte
@@ -86,51 +93,49 @@ void do_send(osjob_t* j){
 
         LMIC_setTxData2(1, (uint8_t*)payload, sizeof(payload), 0);
 
-        #ifdef DEBUG
-          Serial.println(F("Packet queued"));
-        #endif
+        logln(F("Packet queued"));
     }
 }
 
 void onEvent (ev_t ev) {
-    Serial.print(os_getTime());
-    Serial.print(": ");
+    log(os_getTime());
+    log(": ");
     switch(ev) {
         case EV_SCAN_TIMEOUT:
-            Serial.println(F("EV_SCAN_TIMEOUT"));
+            logln(F("EV_SCAN_TIMEOUT"));
             break;
         case EV_BEACON_FOUND:
-            Serial.println(F("EV_BEACON_FOUND"));
+            logln(F("EV_BEACON_FOUND"));
             break;
         case EV_BEACON_MISSED:
-            Serial.println(F("EV_BEACON_MISSED"));
+            logln(F("EV_BEACON_MISSED"));
             break;
         case EV_BEACON_TRACKED:
-            Serial.println(F("EV_BEACON_TRACKED"));
+            logln(F("EV_BEACON_TRACKED"));
             break;
         case EV_JOINING:
-            Serial.println(F("EV_JOINING"));
+            logln(F("EV_JOINING"));
             break;
         case EV_JOINED:
-            Serial.println(F("EV_JOINED"));
+            logln(F("EV_JOINED"));
             break;
         case EV_RFU1:
-            Serial.println(F("EV_RFU1"));
+            logln(F("EV_RFU1"));
             break;
         case EV_JOIN_FAILED:
-            Serial.println(F("EV_JOIN_FAILED"));
+            logln(F("EV_JOIN_FAILED"));
             break;
         case EV_REJOIN_FAILED:
-            Serial.println(F("EV_REJOIN_FAILED"));
+            logln(F("EV_REJOIN_FAILED"));
             break;
         case EV_TXCOMPLETE:
-            Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
+            logln(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
             if (LMIC.txrxFlags & TXRX_ACK)
-                Serial.println(F("Received ack"));
+                logln(F("Received ack"));
             if (LMIC.dataLen) {
-                Serial.println(F("Received "));
-                Serial.println(LMIC.dataLen);
-                Serial.println(F(" bytes of payload"));
+                logln(F("Received "));
+                logln(LMIC.dataLen);
+                logln(F(" bytes of payload"));
             }
 
             // Now preparing to go into sleep mode. The LMIC library already
@@ -141,7 +146,9 @@ void onEvent (ev_t ev) {
             // https://github.com/rocketscream/MiniUltraPro/blob/master/ttn-otaa-sleep.ino
 
             // Ensure all debugging messages are sent before sleep
-            Serial.flush();
+            #ifdef DEBUG
+              Serial.flush();
+            #endif
 
             // Going into sleep for more than 8 s – any better idea?
             for(int i = 0; i < SLEEP_CYCLES; i++) {
@@ -153,35 +160,37 @@ void onEvent (ev_t ev) {
 
             break;
         case EV_LOST_TSYNC:
-            Serial.println(F("EV_LOST_TSYNC"));
+            logln(F("EV_LOST_TSYNC"));
             break;
         case EV_RESET:
-            Serial.println(F("EV_RESET"));
+            logln(F("EV_RESET"));
             break;
         case EV_RXCOMPLETE:
             // data received in ping slot
-            Serial.println(F("EV_RXCOMPLETE"));
+            logln(F("EV_RXCOMPLETE"));
             break;
         case EV_LINK_DEAD:
-            Serial.println(F("EV_LINK_DEAD"));
+            logln(F("EV_LINK_DEAD"));
             break;
         case EV_LINK_ALIVE:
-            Serial.println(F("EV_LINK_ALIVE"));
+            logln(F("EV_LINK_ALIVE"));
             break;
         default:
-            Serial.println(F("Unknown event"));
+            logln(F("Unknown event"));
             break;
     }
 }
 
 void setup() {
-    Serial.begin(9600);
-    Serial.println(F("Starting"));
+    #ifdef DEBUG
+      Serial.begin(9600);
+    #endif
+    logln(F("Starting"));
 
 
     // Setup BME280, use address 0x77 (default) or 0x76
     if (!bme.begin(0x76)) {
-      Serial.println("Could not find a valid BME280 sensor, check wiring!");
+      logln("Could not find a valid BME280 sensor, check wiring!");
       while (1);
     }
 
