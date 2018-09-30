@@ -16,7 +16,7 @@ https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/tt
 
 #include <Credentials.h> // TODO
 
-//#define DEBUG // toggle serial output
+#define DEBUG // toggle serial output
 
 
 #ifdef DEBUG
