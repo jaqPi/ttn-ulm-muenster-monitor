@@ -12,22 +12,35 @@ https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/tt
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include "LowPower.h"
+#include <VL6180X.h>
 
 
 #include <Credentials.h> // TODO
 
 #define DEBUG // toggle serial output
+#define SINGLE_VALUES
+#define numberOfMeasurements 50 // max 255!
+
 
 
 #ifdef DEBUG
-  #define log(x) Serial.print(x);
-  #define logln(x) Serial.println(x);
+  #define print(x) Serial.print(x);
+  #define println(x) Serial.println(x);
 #else
-  #define log(x)
-  #define logln(x)
+  #define print(x)
+  #define println(x)
 #endif
 
 Adafruit_BME280 bme; // I2C, depending on your BME, you have to use address 0x77 (default) or 0x76, see below
+VL6180X sensor;
+
+
+struct Measurement
+{
+    double mean, standardDeviation;
+    uint8_t successfulMeasurements;
+};
+
 
 void os_getArtEui (u1_t* buf) { }
 void os_getDevEui (u1_t* buf) { }
@@ -38,6 +51,10 @@ static osjob_t sendjob;
 const unsigned TX_INTERVAL = 900; // in seconds
 const int SLEEP_CYCLES = (int) (TX_INTERVAL / 8);
 
+
+//float measureDistance();
+
+
 // Pin mapping
 const lmic_pinmap lmic_pins = {
         .nss = 10, // ulm node 10
@@ -47,33 +64,106 @@ const lmic_pinmap lmic_pins = {
 };
 
 void printValues() {
-    log("Temperature = ");
-    log(bme.readTemperature());
-    logln(" *C");
+    print("Temperature = ");
+    print(bme.readTemperature());
+    println(" *C");
 
-    log("Pressure = ");
+    print("Pressure = ");
 
-    log(bme.readPressure());
-    logln(" hPa");
+    print(bme.readPressure());
+    println(" hPa");
 
-    log("Humidity = ");
-    log(bme.readHumidity());
-    logln(" %");
+    print("Humidity = ");
+    print(bme.readHumidity());
+    println(" %");
 
-    logln();
+    println();
+}
+
+struct Measurement measureDistance() {
+    uint8_t measurementSeries[numberOfMeasurements];
+
+    print("Start series with ");
+    print(numberOfMeasurements);
+    println(" measurements");
+    println();
+
+    sensor.startRangeContinuous();
+    double meanDistance = 0.0;
+    uint8_t successfulMeasurements = 0;
+    double variance = 0.0;
+    double standardDeviation = 0.0;
+
+    for (uint8_t i = 0; i < numberOfMeasurements; i++) {
+        uint8_t currentDistance = sensor.readRangeContinuous();
+        if (!sensor.timeoutOccurred()) {
+            measurementSeries[successfulMeasurements] = currentDistance;
+            successfulMeasurements += 1;
+
+            #ifdef SINGLE_VALUES
+                // Print current value to Seriel 
+                if(i == numberOfMeasurements - 1) {
+                    println(currentDistance);  
+                }
+                else {
+                    print(currentDistance);
+                    print(",");
+                }
+            #endif
+        }
+        delay(100);
+    }
+    sensor.stopContinuous();
+
+    // Calculate stats only if there was a successful measurement
+    if (successfulMeasurements > 0)
+    {
+        // Mean distance
+        for(uint8_t i = 0; i < successfulMeasurements; i++) {
+            meanDistance += measurementSeries[i];
+        }
+        meanDistance = meanDistance/successfulMeasurements;
+
+        // Variance
+        for(uint8_t i = 0; i < successfulMeasurements; i++) {
+            variance += sq(measurementSeries[i] - meanDistance);
+        }
+        variance = variance/(successfulMeasurements-1);
+
+        // Standard deviation
+        standardDeviation = sqrt(variance);
+    }
+
+    print("Successful measurements: ");
+    print(successfulMeasurements);
+    print("/");
+    print(numberOfMeasurements);
+    println();
+    print("Mean Distance: ");
+    print(meanDistance);
+    println();
+
+    print("StandardDeviation: ");
+    print(standardDeviation);
+    println();
+    
+	struct Measurement measurement = { meanDistance, standardDeviation, successfulMeasurements };
+
+    return measurement;
 }
 
 
 void do_send(osjob_t* j){
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
-      logln(F("OP_TXRXPEND, not sending"));
+      println(F("OP_TXRXPEND, not sending"));
     } else {
         // temp -> 2 byte
         // pressure -> 2 byte
         // humidity -> 2 byte
-        // sum -> 6 byte
-        byte payload[6];
+        // distance -> 2 byte
+        // sum -> 8 byte
+        byte payload[11];
 
         // Only needed in forced mode. Force update of BME values
         bme.takeForcedMeasurement();
@@ -97,52 +187,64 @@ void do_send(osjob_t* j){
         payload[4] = highByte(humidity);
         payload[5] = lowByte(humidity);
 
+        // distance
+        Measurement measurement = measureDistance();
+        payload[6] = highByte(round(measurement.mean * 100));
+        payload[7] = lowByte(round(measurement.mean * 100));
 
+        payload[8] = highByte(round(measurement.standardDeviation * 100));
+        payload[9] = lowByte(round(measurement.standardDeviation * 100));
+
+        payload[10] = measurement.successfulMeasurements;
+
+
+
+        
         LMIC_setTxData2(1, (uint8_t*)payload, sizeof(payload), 0);
 
-        logln(F("Packet queued"));
+        println(F("Packet queued"));
     }
 }
 
 void onEvent (ev_t ev) {
-    log(os_getTime());
-    log(": ");
+    print(os_getTime());
+    print(": ");
     switch(ev) {
         case EV_SCAN_TIMEOUT:
-            logln(F("EV_SCAN_TIMEOUT"));
+            println(F("EV_SCAN_TIMEOUT"));
             break;
         case EV_BEACON_FOUND:
-            logln(F("EV_BEACON_FOUND"));
+            println(F("EV_BEACON_FOUND"));
             break;
         case EV_BEACON_MISSED:
-            logln(F("EV_BEACON_MISSED"));
+            println(F("EV_BEACON_MISSED"));
             break;
         case EV_BEACON_TRACKED:
-            logln(F("EV_BEACON_TRACKED"));
+            println(F("EV_BEACON_TRACKED"));
             break;
         case EV_JOINING:
-            logln(F("EV_JOINING"));
+            println(F("EV_JOINING"));
             break;
         case EV_JOINED:
-            logln(F("EV_JOINED"));
+            println(F("EV_JOINED"));
             break;
         case EV_RFU1:
-            logln(F("EV_RFU1"));
+            println(F("EV_RFU1"));
             break;
         case EV_JOIN_FAILED:
-            logln(F("EV_JOIN_FAILED"));
+            println(F("EV_JOIN_FAILED"));
             break;
         case EV_REJOIN_FAILED:
-            logln(F("EV_REJOIN_FAILED"));
+            println(F("EV_REJOIN_FAILED"));
             break;
         case EV_TXCOMPLETE:
-            logln(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
+            println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
             if (LMIC.txrxFlags & TXRX_ACK)
-                logln(F("Received ack"));
+                println(F("Received ack"));
             if (LMIC.dataLen) {
-                logln(F("Received "));
-                logln(LMIC.dataLen);
-                logln(F(" bytes of payload"));
+                println(F("Received "));
+                println(LMIC.dataLen);
+                println(F(" bytes of payload"));
             }
 
             // Now preparing to go into sleep mode. The LMIC library already
@@ -167,23 +269,23 @@ void onEvent (ev_t ev) {
 
             break;
         case EV_LOST_TSYNC:
-            logln(F("EV_LOST_TSYNC"));
+            println(F("EV_LOST_TSYNC"));
             break;
         case EV_RESET:
-            logln(F("EV_RESET"));
+            println(F("EV_RESET"));
             break;
         case EV_RXCOMPLETE:
             // data received in ping slot
-            logln(F("EV_RXCOMPLETE"));
+            println(F("EV_RXCOMPLETE"));
             break;
         case EV_LINK_DEAD:
-            logln(F("EV_LINK_DEAD"));
+            println(F("EV_LINK_DEAD"));
             break;
         case EV_LINK_ALIVE:
-            logln(F("EV_LINK_ALIVE"));
+            println(F("EV_LINK_ALIVE"));
             break;
         default:
-            logln(F("Unknown event"));
+            println(F("Unknown event"));
             break;
     }
 }
@@ -192,12 +294,12 @@ void setup() {
     #ifdef DEBUG
       Serial.begin(9600);
     #endif
-    logln(F("Starting"));
+    println(F("Starting"));
 
 
     // Setup BME280, use address 0x77 (default) or 0x76
     if (!bme.begin(0x76)) {
-      logln("Could not find a valid BME280 sensor, check wiring!");
+      println("Could not find a valid BME280 sensor, check wiring!");
       while (1);
     }
 
@@ -211,6 +313,16 @@ void setup() {
                     Adafruit_BME280::SAMPLING_X1, // pressure
                     Adafruit_BME280::SAMPLING_X1, // humidity
                     Adafruit_BME280::FILTER_OFF   );
+
+    // init tof sensor
+    sensor.init();
+    sensor.configureDefault();
+    sensor.setTimeout(500);
+    // stop continuous mode if already active
+    sensor.stopContinuous();
+    // in case stopContinuous() triggered a single-shot
+    // measurement, wait for it to complete
+    delay(300);
 
     // LMIC init
     os_init();
