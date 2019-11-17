@@ -18,7 +18,7 @@ https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/tt
 #include <Credentials.h> // TODO
 
 #define DEBUG // toggle serial output
-#define SINGLE_VALUES
+// #define SINGLE_VALUES
 #define numberOfMeasurements 50 // max 255!
 
 
@@ -35,10 +35,15 @@ Adafruit_BME280 bme; // I2C, depending on your BME, you have to use address 0x77
 VL6180X sensor;
 
 
-struct Measurement
+struct Stats
 {
     double mean, standardDeviation;
-    uint8_t successfulMeasurements;
+};
+
+struct Measurement
+{
+    double meanDistance, standardDeviationDistance, meanAmbientLight, standardDeviationAmbientLight;
+    uint8_t successfulMeasurementsDistance, successfulMeasurementsAmbientLight;
 };
 
 
@@ -52,9 +57,6 @@ const unsigned TX_INTERVAL = 900; // in seconds
 const int SLEEP_CYCLES = (int) (TX_INTERVAL / 8);
 
 
-//float measureDistance();
-
-
 // Pin mapping
 const lmic_pinmap lmic_pins = {
         .nss = 10, // ulm node 10
@@ -64,41 +66,84 @@ const lmic_pinmap lmic_pins = {
 };
 
 void printValues() {
-    print("Temperature = ");
-    print(bme.readTemperature());
-    println(" *C");
+    // print("Temperature = ");
+    // print(bme.readTemperature());
+    // println(" *C");
 
-    print("Pressure = ");
+    // print("Pressure = ");
 
-    print(bme.readPressure());
-    println(" hPa");
+    // print(bme.readPressure());
+    // println(" hPa");
 
-    print("Humidity = ");
-    print(bme.readHumidity());
-    println(" %");
+    // print("Humidity = ");
+    // print(bme.readHumidity());
+    // println(" %");
 
-    println();
+    // println();
 }
 
-struct Measurement measureDistance() {
-    uint8_t measurementSeries[numberOfMeasurements];
-
-    print("Start series with ");
-    print(numberOfMeasurements);
-    println(" measurements");
-    println();
-
-    sensor.startRangeContinuous();
-    double meanDistance = 0.0;
-    uint8_t successfulMeasurements = 0;
+struct Stats calcStats(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements]) {
+    double mean = 0.0;
     double variance = 0.0;
     double standardDeviation = 0.0;
 
+    // Calculate stats only if there was a successful measurement
+    if (successfulMeasurements > 0)
+    {
+        // Mean
+        for(uint8_t i = 0; i < successfulMeasurements; i++) {
+            mean += measurementSeries[i];
+        }
+        mean = mean/successfulMeasurements;
+
+        // Variance
+        for(uint8_t i = 0; i < successfulMeasurements; i++) {
+            variance += sq(measurementSeries[i] - mean);
+        }
+        variance = variance/(successfulMeasurements-1);
+
+        // Standard deviation
+        standardDeviation = sqrt(variance);
+    }
+    return Stats { mean, standardDeviation};
+}
+
+
+struct Measurement measureDistance() {
+    uint16_t measurementSeriesDistance[numberOfMeasurements];
+    uint16_t measurementSeriesAmbientLight[numberOfMeasurements];
+
+    print("Start ");
+    println(numberOfMeasurements);
+
+    sensor.startInterleavedContinuous();
+    uint8_t successfulMeasurementsDistance = 0;
+    uint8_t successfulMeasurementsAmbientLight = 0;
+
     for (uint8_t i = 0; i < numberOfMeasurements; i++) {
-        uint8_t currentDistance = sensor.readRangeContinuous();
+        // Ambient Light
+        uint16_t currentAmbientLight = sensor.readAmbientContinuous();
         if (!sensor.timeoutOccurred()) {
-            measurementSeries[successfulMeasurements] = currentDistance;
-            successfulMeasurements += 1;
+            measurementSeriesAmbientLight[successfulMeasurementsAmbientLight] = currentAmbientLight;
+            successfulMeasurementsAmbientLight += 1;
+
+            #ifdef SINGLE_VALUES
+                // Print current value to Seriel 
+                if(i == numberOfMeasurements - 1) {
+                    println(currentAmbientLight);  
+                }
+                else {
+                    print(currentAmbientLight);
+                    print(",");
+                }
+            #endif
+        }
+        
+        // Distance
+        uint16_t currentDistance = (uint16_t) sensor.readRangeContinuous();
+        if (!sensor.timeoutOccurred()) {
+            measurementSeriesDistance[successfulMeasurementsDistance] = currentDistance;
+            successfulMeasurementsDistance += 1;
 
             #ifdef SINGLE_VALUES
                 // Print current value to Seriel 
@@ -111,43 +156,41 @@ struct Measurement measureDistance() {
                 }
             #endif
         }
-        delay(100);
     }
     sensor.stopContinuous();
 
-    // Calculate stats only if there was a successful measurement
-    if (successfulMeasurements > 0)
-    {
-        // Mean distance
-        for(uint8_t i = 0; i < successfulMeasurements; i++) {
-            meanDistance += measurementSeries[i];
-        }
-        meanDistance = meanDistance/successfulMeasurements;
+    struct Stats statsAmbientLight = calcStats(successfulMeasurementsAmbientLight, measurementSeriesAmbientLight);
+    struct Stats statsDistance = calcStats(successfulMeasurementsDistance, measurementSeriesDistance);
 
-        // Variance
-        for(uint8_t i = 0; i < successfulMeasurements; i++) {
-            variance += sq(measurementSeries[i] - meanDistance);
-        }
-        variance = variance/(successfulMeasurements-1);
+    
 
-        // Standard deviation
-        standardDeviation = sqrt(variance);
-    }
+    // print("Distsucc: ");
+    // print(successfulMeasurementsDistance);
+    // print("/");
+    // print(numberOfMeasurements);
+    // println();
+    print("DistMean:");
+    print(statsDistance.mean);
+    println();
 
-    print("Successful measurements: ");
-    print(successfulMeasurements);
+    print("DistSD:");
+    print(statsDistance.standardDeviation);
+    println();
+
+    print("ALSsucc:");
+    print(successfulMeasurementsAmbientLight);
     print("/");
     print(numberOfMeasurements);
     println();
-    print("Mean Distance: ");
-    print(meanDistance);
+    print("ALSmean:");
+    print(statsAmbientLight.mean);
     println();
 
-    print("StandardDeviation: ");
-    print(standardDeviation);
+    print("ALSSD:");
+    print(statsAmbientLight.standardDeviation);
     println();
     
-	struct Measurement measurement = { meanDistance, standardDeviation, successfulMeasurements };
+	struct Measurement measurement = { statsDistance.mean, statsDistance.standardDeviation, statsAmbientLight.mean, statsAmbientLight.standardDeviation, successfulMeasurementsDistance, successfulMeasurementsAmbientLight };
 
     return measurement;
 }
@@ -163,7 +206,7 @@ void do_send(osjob_t* j){
         // humidity -> 2 byte
         // distance -> 2 byte
         // sum -> 8 byte
-        byte payload[11];
+        byte payload[16];
 
         // Only needed in forced mode. Force update of BME values
         bme.takeForcedMeasurement();
@@ -189,15 +232,26 @@ void do_send(osjob_t* j){
 
         // distance
         Measurement measurement = measureDistance();
-        payload[6] = highByte(round(measurement.mean * 100));
-        payload[7] = lowByte(round(measurement.mean * 100));
+        int meanDistance = round(measurement.meanDistance * 100);
+        payload[6] = highByte(meanDistance);
+        payload[7] = lowByte(meanDistance);
 
-        payload[8] = highByte(round(measurement.standardDeviation * 100));
-        payload[9] = lowByte(round(measurement.standardDeviation * 100));
+        int standardDeviationDistance = round(measurement.standardDeviationDistance * 100);
+        payload[8] = highByte(standardDeviationDistance);
+        payload[9] = lowByte(standardDeviationDistance);
 
-        payload[10] = measurement.successfulMeasurements;
+        payload[10] = measurement.successfulMeasurementsDistance;
 
+        // ambientLight
+        int meanAmbientLight = round(measurement.meanAmbientLight * 100);
+        payload[11] = highByte(meanAmbientLight);
+        payload[12] = lowByte(meanAmbientLight);
 
+        int standardDeviationAmbientLight = round(measurement.standardDeviationAmbientLight * 100);
+        payload[13] = highByte(standardDeviationAmbientLight);
+        payload[14] = lowByte(standardDeviationAmbientLight);
+
+        payload[15] = measurement.successfulMeasurementsAmbientLight;
 
         
         LMIC_setTxData2(1, (uint8_t*)payload, sizeof(payload), 0);
@@ -210,33 +264,33 @@ void onEvent (ev_t ev) {
     print(os_getTime());
     print(": ");
     switch(ev) {
-        case EV_SCAN_TIMEOUT:
-            println(F("EV_SCAN_TIMEOUT"));
-            break;
-        case EV_BEACON_FOUND:
-            println(F("EV_BEACON_FOUND"));
-            break;
-        case EV_BEACON_MISSED:
-            println(F("EV_BEACON_MISSED"));
-            break;
-        case EV_BEACON_TRACKED:
-            println(F("EV_BEACON_TRACKED"));
-            break;
-        case EV_JOINING:
-            println(F("EV_JOINING"));
-            break;
-        case EV_JOINED:
-            println(F("EV_JOINED"));
-            break;
-        case EV_RFU1:
-            println(F("EV_RFU1"));
-            break;
-        case EV_JOIN_FAILED:
-            println(F("EV_JOIN_FAILED"));
-            break;
-        case EV_REJOIN_FAILED:
-            println(F("EV_REJOIN_FAILED"));
-            break;
+        // case EV_SCAN_TIMEOUT:
+        //     println(F("EV_SCAN_TIMEOUT"));
+        //     break;
+        // case EV_BEACON_FOUND:
+        //     println(F("EV_BEACON_FOUND"));
+        //     break;
+        // case EV_BEACON_MISSED:
+        //     println(F("EV_BEACON_MISSED"));
+        //     break;
+        // case EV_BEACON_TRACKED:
+        //     println(F("EV_BEACON_TRACKED"));
+        //     break;
+        // case EV_JOINING:
+        //     println(F("EV_JOINING"));
+        //     break;
+        // case EV_JOINED:
+        //     println(F("EV_JOINED"));
+        //     break;
+        // case EV_RFU1:
+        //     println(F("EV_RFU1"));
+        //     break;
+        // case EV_JOIN_FAILED:
+        //     println(F("EV_JOIN_FAILED"));
+        //     break;
+        // case EV_REJOIN_FAILED:
+        //     println(F("EV_REJOIN_FAILED"));
+        //     break;
         case EV_TXCOMPLETE:
             println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
             if (LMIC.txrxFlags & TXRX_ACK)
@@ -268,22 +322,22 @@ void onEvent (ev_t ev) {
             os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(1), do_send);
 
             break;
-        case EV_LOST_TSYNC:
-            println(F("EV_LOST_TSYNC"));
-            break;
-        case EV_RESET:
-            println(F("EV_RESET"));
-            break;
-        case EV_RXCOMPLETE:
-            // data received in ping slot
-            println(F("EV_RXCOMPLETE"));
-            break;
-        case EV_LINK_DEAD:
-            println(F("EV_LINK_DEAD"));
-            break;
-        case EV_LINK_ALIVE:
-            println(F("EV_LINK_ALIVE"));
-            break;
+        // case EV_LOST_TSYNC:
+        //     println(F("EV_LOST_TSYNC"));
+        //     break;
+        // case EV_RESET:
+        //     println(F("EV_RESET"));
+        //     break;
+        // case EV_RXCOMPLETE:
+        //     // data received in ping slot
+        //     println(F("EV_RXCOMPLETE"));
+        //     break;
+        // case EV_LINK_DEAD:
+        //     println(F("EV_LINK_DEAD"));
+        //     break;
+        // case EV_LINK_ALIVE:
+        //     println(F("EV_LINK_ALIVE"));
+        //     break;
         default:
             println(F("Unknown event"));
             break;
@@ -299,7 +353,7 @@ void setup() {
 
     // Setup BME280, use address 0x77 (default) or 0x76
     if (!bme.begin(0x76)) {
-      println("Could not find a valid BME280 sensor, check wiring!");
+      println("no BME280");
       while (1);
     }
 
