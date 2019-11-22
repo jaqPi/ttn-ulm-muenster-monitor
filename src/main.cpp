@@ -19,7 +19,7 @@ https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/tt
 
 #define DEBUG // toggle serial output
 // #define SINGLE_VALUES
-#define numberOfMeasurements 50 // max 255!
+const uint8_t numberOfMeasurements = 50; // max 255!
 
 
 
@@ -169,7 +169,7 @@ struct Measurement measureDistance() {
     // print("/");
     // print(numberOfMeasurements);
     // println();
-    print("DistMean:");
+    print("DistM:");
     print(statsDistance.mean);
     println();
 
@@ -177,12 +177,12 @@ struct Measurement measureDistance() {
     print(statsDistance.standardDeviation);
     println();
 
-    print("ALSsucc:");
+    print("ALSsuc:");
     print(successfulMeasurementsAmbientLight);
     print("/");
     print(numberOfMeasurements);
     println();
-    print("ALSmean:");
+    print("ALSM:");
     print(statsAmbientLight.mean);
     println();
 
@@ -199,7 +199,7 @@ struct Measurement measureDistance() {
 void do_send(osjob_t* j){
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
-      println(F("OP_TXRXPEND, not sending"));
+      //println(F("OP_TXRXPEND, not sending"));
     } else {
         // temp -> 2 byte
         // pressure -> 2 byte
@@ -256,7 +256,7 @@ void do_send(osjob_t* j){
         
         LMIC_setTxData2(1, (uint8_t*)payload, sizeof(payload), 0);
 
-        println(F("Packet queued"));
+        println(F("Pckt qd"));
     }
 }
 
@@ -292,14 +292,14 @@ void onEvent (ev_t ev) {
         //     println(F("EV_REJOIN_FAILED"));
         //     break;
         case EV_TXCOMPLETE:
-            println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
-            if (LMIC.txrxFlags & TXRX_ACK)
-                println(F("Received ack"));
-            if (LMIC.dataLen) {
-                println(F("Received "));
-                println(LMIC.dataLen);
-                println(F(" bytes of payload"));
-            }
+            // println(F("EV_TXCOMPLETE"));
+            // if (LMIC.txrxFlags & TXRX_ACK)
+            //     println(F("Received ack"));
+            // if (LMIC.dataLen) {
+            //     println(F("Received "));
+            //     println(LMIC.dataLen);
+            //     println(F(" bytes of payload"));
+            // }
 
             // Now preparing to go into sleep mode. The LMIC library already
             // powers down the RFM95, see
@@ -338,9 +338,9 @@ void onEvent (ev_t ev) {
         // case EV_LINK_ALIVE:
         //     println(F("EV_LINK_ALIVE"));
         //     break;
-        default:
-            println(F("Unknown event"));
-            break;
+        // default:
+        //     println(F("Unknown event"));
+        //     break;
     }
 }
 
@@ -353,7 +353,7 @@ void setup() {
 
     // Setup BME280, use address 0x77 (default) or 0x76
     if (!bme.begin(0x76)) {
-      println("no BME280");
+      println(F("no BME"));
       while (1);
     }
 
