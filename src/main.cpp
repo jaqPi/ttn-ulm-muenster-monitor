@@ -82,12 +82,9 @@ void printValues() {
     // println();
 }
 
-struct Stats calcStats(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements]) {
+double calcMean(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements]) {
     double mean = 0.0;
-    double variance = 0.0;
-    double standardDeviation = 0.0;
 
-    // Calculate stats only if there was a successful measurement
     if (successfulMeasurements > 0)
     {
         // Mean
@@ -95,7 +92,16 @@ struct Stats calcStats(uint8_t successfulMeasurements, uint16_t measurementSerie
             mean += measurementSeries[i];
         }
         mean = mean/successfulMeasurements;
+    }
+      
+    return mean;
+}
 
+double calcSD(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements], double mean) {
+    double standardDeviation = 0.0;
+    if (successfulMeasurements > 0)
+    {
+        double variance = 0.0;
         // Variance
         for(uint8_t i = 0; i < successfulMeasurements; i++) {
             variance += sq(measurementSeries[i] - mean);
@@ -105,7 +111,13 @@ struct Stats calcStats(uint8_t successfulMeasurements, uint16_t measurementSerie
         // Standard deviation
         standardDeviation = sqrt(variance);
     }
-    return Stats { mean, standardDeviation};
+    
+     return standardDeviation;   
+}
+
+struct Stats calcStats(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements]) {
+    double mean = calcMean(successfulMeasurements, measurementSeries);
+    return Stats { mean, calcSD(successfulMeasurements, measurementSeries, mean)};
 }
 
 
@@ -195,7 +207,6 @@ struct Measurement measureDistance() {
     return measurement;
 }
 
-
 void do_send(osjob_t* j){
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
@@ -261,8 +272,8 @@ void do_send(osjob_t* j){
 }
 
 void onEvent (ev_t ev) {
-    print(os_getTime());
-    print(": ");
+    // print(os_getTime());
+    // print(": ");
     switch(ev) {
         // case EV_SCAN_TIMEOUT:
         //     println(F("EV_SCAN_TIMEOUT"));
@@ -353,7 +364,7 @@ void setup() {
 
     // Setup BME280, use address 0x77 (default) or 0x76
     if (!bme.begin(0x76)) {
-      println(F("no BME"));
+      println(F("noBME"));
       while (1);
     }
 
