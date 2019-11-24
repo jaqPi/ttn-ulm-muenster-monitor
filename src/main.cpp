@@ -82,6 +82,14 @@ void printValues() {
     // println();
 }
 
+float measureBatteryVoltage() {
+    float measuredvbat = analogRead(A0);
+    measuredvbat *= 2;    // we divided by 2, so multiply back
+    measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+    measuredvbat /= 1024; // convert to voltage
+    return measuredvbat;
+}
+
 double calcMean(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements]) {
     double mean = 0.0;
 
@@ -217,7 +225,7 @@ void do_send(osjob_t* j){
         // humidity -> 2 byte
         // distance -> 2 byte
         // sum -> 8 byte
-        byte payload[16];
+        byte payload[18];
 
         // Only needed in forced mode. Force update of BME values
         bme.takeForcedMeasurement();
@@ -263,6 +271,10 @@ void do_send(osjob_t* j){
         payload[14] = lowByte(standardDeviationAmbientLight);
 
         payload[15] = measurement.successfulMeasurementsAmbientLight;
+
+        int batteryVoltage = round(measureBatteryVoltage() * 100);
+        payload[16] = highByte(batteryVoltage);
+        payload[17] = lowByte(batteryVoltage);
 
         
         LMIC_setTxData2(1, (uint8_t*)payload, sizeof(payload), 0);
