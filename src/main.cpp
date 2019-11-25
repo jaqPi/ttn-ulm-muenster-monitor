@@ -101,7 +101,7 @@ double calcMean(uint8_t successfulMeasurements, uint16_t measurementSeries[numbe
         }
         mean = mean/successfulMeasurements;
     }
-      
+
     return mean;
 }
 
@@ -119,8 +119,8 @@ double calcSD(uint8_t successfulMeasurements, uint16_t measurementSeries[numberO
         // Standard deviation
         standardDeviation = sqrt(variance);
     }
-    
-     return standardDeviation;   
+
+     return standardDeviation;
 }
 
 struct Stats calcStats(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements]) {
@@ -148,9 +148,9 @@ struct Measurement measureDistance() {
             successfulMeasurementsAmbientLight += 1;
 
             #ifdef SINGLE_VALUES
-                // Print current value to Seriel 
+                // Print current value to Serial
                 if(i == numberOfMeasurements - 1) {
-                    println(currentAmbientLight);  
+                    println(currentAmbientLight);
                 }
                 else {
                     print(currentAmbientLight);
@@ -158,7 +158,7 @@ struct Measurement measureDistance() {
                 }
             #endif
         }
-        
+
         // Distance
         uint16_t currentDistance = (uint16_t) sensor.readRangeContinuous();
         if (!sensor.timeoutOccurred()) {
@@ -166,9 +166,9 @@ struct Measurement measureDistance() {
             successfulMeasurementsDistance += 1;
 
             #ifdef SINGLE_VALUES
-                // Print current value to Seriel 
+                // Print current value to Serial
                 if(i == numberOfMeasurements - 1) {
-                    println(currentDistance);  
+                    println(currentDistance);
                 }
                 else {
                     print(currentDistance);
@@ -182,7 +182,7 @@ struct Measurement measureDistance() {
     struct Stats statsAmbientLight = calcStats(successfulMeasurementsAmbientLight, measurementSeriesAmbientLight);
     struct Stats statsDistance = calcStats(successfulMeasurementsDistance, measurementSeriesDistance);
 
-    
+
 
     // print("Distsucc: ");
     // print(successfulMeasurementsDistance);
@@ -209,7 +209,7 @@ struct Measurement measureDistance() {
     print("ALSSD:");
     print(statsAmbientLight.standardDeviation);
     println();
-    
+
 	struct Measurement measurement = { statsDistance.mean, statsDistance.standardDeviation, statsAmbientLight.mean, statsAmbientLight.standardDeviation, successfulMeasurementsDistance, successfulMeasurementsAmbientLight };
 
     return measurement;
@@ -276,7 +276,7 @@ void do_send(osjob_t* j){
         payload[16] = highByte(batteryVoltage);
         payload[17] = lowByte(batteryVoltage);
 
-        
+
         LMIC_setTxData2(1, (uint8_t*)payload, sizeof(payload), 0);
 
         println(F("Pckt qd"));
