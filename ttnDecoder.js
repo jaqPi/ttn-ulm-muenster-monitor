@@ -11,8 +11,8 @@ function Decoder(bytes, port) {
 
   // Zusätzliche Werte, etwas Statistik für die Entwicklung:
   decoded.meanDistance = ((bytes[6] << 8) + bytes[7]) / 100;
-  decoded.standardDeviation = ((bytes[8] << 8) + bytes[9]) / 100;
-  decoded.successfulMeasurements = parseInt(bytes[10],10);
+  decoded.standardDeviationDistance = ((bytes[8] << 8) + bytes[9]) / 100;
+  decoded.successfulMeasurementsDistance = parseInt(bytes[10],10);
   decoded.meanAmbientLight = decoded.ambientLight;
   decoded.standardDeviationAmbientLight = ((bytes[13] << 8) + bytes[14]) / 100;
   decoded.successfulMeasurementsAmbientLight = parseInt(bytes[15],10);
