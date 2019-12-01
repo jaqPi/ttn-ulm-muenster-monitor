@@ -129,12 +129,16 @@ struct Stats calcStats(uint8_t successfulMeasurements, uint16_t measurementSerie
 }
 
 
-struct Measurement measureDistance() {
+struct Measurement measureDistanceAndAmbientLight() {
     uint16_t measurementSeriesDistance[numberOfMeasurements];
     uint16_t measurementSeriesAmbientLight[numberOfMeasurements];
 
     print("Start ");
     println(numberOfMeasurements);
+
+    // calibrate sensor in terms of temperature
+    sensor.writeReg(sensor.SYSRANGE__VHV_RECALIBRATE, 0x01);    
+
 
     sensor.startInterleavedContinuous();
     uint8_t successfulMeasurementsDistance = 0;
@@ -250,7 +254,7 @@ void do_send(osjob_t* j){
         payload[5] = lowByte(humidity);
 
         // distance
-        Measurement measurement = measureDistance();
+        Measurement measurement = measureDistanceAndAmbientLight();
         int meanDistance = round(measurement.meanDistance * 100);
         payload[6] = highByte(meanDistance);
         payload[7] = lowByte(meanDistance);
@@ -400,6 +404,9 @@ void setup() {
     // in case stopContinuous() triggered a single-shot
     // measurement, wait for it to complete
     delay(300);
+
+    // disable auto calibrate (to do it manually before every series)
+    sensor.writeReg(sensor.SYSRANGE__VHV_REPEAT_RATE, 0x00);    
 
     // LMIC init
     os_init();
