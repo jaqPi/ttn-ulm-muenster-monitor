@@ -228,7 +228,14 @@ void do_send(osjob_t* j){
         // pressure -> 2 byte
         // humidity -> 2 byte
         // distance -> 2 byte
-        // sum -> 8 byte
+        // distanceSD -> 2 byte
+        // distanceSucc -> 1 byte
+        // ambientLight -> 2 byte
+        // ambientLightSD -> 2 byte
+        // ambietnLightSucc -> 1 byte
+        // batteryVoltage -> 2 byte
+
+        // sum -> 18 byte
         byte payload[18];
 
         // Only needed in forced mode. Force update of BME values
