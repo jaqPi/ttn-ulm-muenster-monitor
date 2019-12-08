@@ -137,7 +137,7 @@ struct Measurement measureDistanceAndAmbientLight() {
     println(numberOfMeasurements);
 
     // calibrate sensor in terms of temperature
-    sensor.writeReg(sensor.SYSRANGE__VHV_RECALIBRATE, 0x01);    
+    //sensor.writeReg(sensor.SYSRANGE__VHV_RECALIBRATE, 0x01);    
 
 
     sensor.startInterleavedContinuous();
@@ -414,6 +414,9 @@ void setup() {
 
     // disable auto calibrate (to do it manually before every series)
     sensor.writeReg(sensor.SYSRANGE__VHV_REPEAT_RATE, 0x00);    
+    // calibrate single time (actually the sensor should have done it during start up)
+    sensor.writeReg(sensor.SYSRANGE__VHV_RECALIBRATE, 0x01);    
+
 
     // LMIC init
     os_init();
