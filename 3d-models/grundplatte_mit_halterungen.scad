@@ -10,84 +10,92 @@
 // R Radius
 // D Durchmesser
 
+
 $fa = 0.1;
 $fs = 0.1;
 
 // PARAMETRIERUNG
 
+e           = 0.4;  // Luft für Ungenauigkeiten des Druckers.
 
-//Grundplatte gp:
+
+//Grundplatte gp mit Bohrungen:
 gpUrsprX    = 0;
 gpUrsprY    = 0;
 
-gpB         = 72;
-gpH         = 72;
-gpT         = 1;
+gpB         = 70;
+gpH         = 70;
+gpT         = 6.2; //6.2
 
-gpBohrungX  = 5;
-gpBohrungY  = 5;
-gpBohrungD  = 3;
-gpBohrungB  = gpB - 2 * gpBohrungX;
-gpBohrungH  = gpH - 2 * gpBohrungY;
+gpBohrungAktiv =  true;
+gpBohrungX  = 0;
+gpBohrungY  = 0;
+gpBohrungD  = 5;
+gpBohrungB  = gpB;//gpB - 2 * gpBohrungX;
+gpBohrungH  = gpH;//gpH - 2 * gpBohrungY;
 
 
 // Pins für Mikro-Controller pc:
-pcX         = 35;  // Position Mittelpunkt Pin links unten
-pcY         = 20;
+pcX         = 20;  // Position Mittelpunkt Pin links unten
+pcY         = 10;
 // Maße für den Adafruit Feather:
-pcB         = 17.6;  // Abstand Mittelpunkte Pins in x-Richtung
-pcH         = 45.6;  // Abstand Mittelpunkte Pins in x-Richtung
+pcB         = 45.6;  // Abstand Mittelpunkte Pins in x-Richtung
+pcH         = 17.6;  // Abstand Mittelpunkte Pins in x-Richtung
 
 pcBasisD    = 4;
-pcBasisT    = 4 + gpT;
-pcPinD      = 2.5;
-pcPinT      = 2.5 + pcBasisT;  // Dicke PCB Feather ~ 1,6 mm
+pcBasisT    = 7 + 4 + gpT; // 7 mm für Dicke Akku, 4 mm Luft
+pcPinD      = 2.5 - 1.5 * e;
+pcPinT      = 4  + pcBasisT;  // Dicke PCB Feather ~ 1,6 mm
 
 
 
 // Röhre als Durchlass r:
 
-rH          = 20;
+rH          = 12;
 rDAussen    = 14;
 rDickeWand  = 1;
 rBasisD     = 4 + rDAussen;
-rBasisH     = 1.5;
-
+rBasisH     = 1.0;
+rHoeheUnterkanteBasisDUeberGP = 0;
 
 // Scheibe zum Abschluss der Röhre s:
 
-sDicke      = 0.5;
-rHalterungBasisH = rBasisH + sDicke;
+sDicke      = 1;
+rHalterungBasisH = rBasisH + sDicke + 1.5 * e;
+rHalterungBasisH = sDicke + 1.5 * e;
 
 
 // Break out boards bob:
 
-bobHoeheUnterkanteUberGP = 0;
-bobSteckerT = 2.5;
+bobHoeheUnterkanteUeberGP = 4;
+bobSteckerT = 2.6;
 babAbstaendeInHalterung = 2;
-
-
-// VL6180X, Pololu-Breakoutboard bobVL6180X:
-
-bobVL6180XBreite = 17.8;
-bobVL6180XDicke = 1;
-bobVL6180XHoeheBisStecker = 10;
-bobVL6180XHoehe = bobVL6180XHoeheBisStecker + bobSteckerT;
-bobVL6180XBreiteFuge = 1;  // Dicke PCB bobVL6180X ~ 1 mm
-bobVL6180XX = 9;
-bobVL6180XY = babAbstaendeInHalterung + 0;
-bobVL6180XZ = gpT + bobHoeheUnterkanteUberGP;
 
 
 // BME280, Billo-Breakoutboard bobBME280:
 
-bobBME280Breite = 10.5;
-bobBME280Dicke = 1.55;
-bobBME280HoeheBisStecker = 10;
-bobBME280BreiteFuge = 1.6;  // Dicke PCB bobBME280 ~ 1,57 mm
-bobVME280X = 8.5;     // relativ zum Sensorhalterblock
-bobVME280Y = bobVL6180XY + bobVL6180XBreite + babAbstaendeInHalterung;
-bobVME280Z = gpT + bobHoeheUnterkanteUberGP;
+bobBME280Breite             = 10.5 + e;
+bobBME280Dicke              = 1.55 + e; // Dicke PCB bobBME280 ~ 1,57 mm
+bobBME280HoeheBisStecker    = 11;
+bobBME280TiefeFuge          = 1 - e;
+bobVME280X                  = 4;      // relativ zum Sensorhalterblock
+//bobVME280Y                = bobVL6180XY + bobVL6180XBreite + babAbstaendeInHalterung;
+bobVME280Y                  = babAbstaendeInHalterung + 0;
+bobVME280Z                  = gpT + bobHoeheUnterkanteUeberGP - (gpT - 1) - 1;
+
+
+// VL6180X, Pololu-Breakoutboard bobVL6180X:
+
+bobVL6180XBreite            = 17.8 + e;
+bobVL6180XDicke             = 0.9 + e;
+bobVL6180XHoeheBisStecker   = 10;
+bobVL6180XHoehe             = bobVL6180XHoeheBisStecker + bobSteckerT;
+bobVL6180XTiefeFuge         = 1 - e ;       // Dicke PCB bobVL6180X ~ 1 mm
+bobVL6180XX                 = 9;
+//bobVL6180XY               = babAbstaendeInHalterung + 0;
+bobVL6180XY                 = bobVME280Y + bobBME280Breite + babAbstaendeInHalterung;
+bobVL6180XZ                 = gpT + bobHoeheUnterkanteUeberGP - (gpT - 1);
+
 
 // Block, um in der Sensorhalterung Aussparungen für die Stecker zu schaffen
 
@@ -100,10 +108,10 @@ mBreakoutboardSteckerBlockOffsetX = -2; // Für Überstand Pins/Lötkegel
 
 sbB     = 11;
 sbH     = bobVL6180XBreite + bobBME280Breite + 3 * babAbstaendeInHalterung;
-sbT     = gpT + bobHoeheUnterkanteUberGP + bobVL6180XHoehe;
+sbT     = gpT + bobHoeheUnterkanteUeberGP + bobVL6180XHoehe - (gpT - 1);
 sbX     = 0;
-sbY     = 20;
-sbZ     = 0;
+sbY     = 48 - ( 2 * ( 2 + e ) + bobBME280Breite + (rBasisD - rDAussen) / 2);
+sbZ     = gpT - 0.2;
 
 
 
@@ -115,14 +123,16 @@ sbZ     = 0;
 
 // Grundplatte mit Pins:
 
-module bohrung (x, y, z = 0) {
+module bohrung (x, y, z = 0,
+                h = gpT * 4, d = gpBohrungD, centered = true
+                ) {
     translate([x, y, z]) {
-        cylinder(h = gpT * 4, d = gpBohrungD, center = true);
+        cylinder(h = h, d = d, center = centered);
     }
 }
 
 module pin (x, y, z = 0) {
-    translate([x, y, 0]) {
+    translate([x, y, z]) {
         union () {
             cylinder(h = pcBasisT, d = pcBasisD);
             cylinder(h = pcPinT, d = pcPinD);
@@ -132,11 +142,41 @@ module pin (x, y, z = 0) {
 
 
 difference () {
+
     cube([gpB, gpH, gpT]);
-    bohrung(gpBohrungX             , gpBohrungY);
-    bohrung(gpBohrungX + gpBohrungB, gpBohrungY);
-    bohrung(gpBohrungX             , gpBohrungY + gpBohrungH);
-    bohrung(gpBohrungX + gpBohrungB, gpBohrungY + gpBohrungH);
+
+    if (gpBohrungAktiv) {
+        bohrung(gpBohrungX             , gpBohrungY);
+        bohrung(gpBohrungX + gpBohrungB, gpBohrungY);
+        bohrung(gpBohrungX             , gpBohrungY + gpBohrungH);
+        bohrung(gpBohrungX + gpBohrungB, gpBohrungY + gpBohrungH);
+    }
+    
+    bohrung(x = 35, y = 1, d = 10 + 3 * e);
+    bohrung(x = 35, y = 70 - 1, d = 10 + 3 * e);
+    translate([35, 0, 0]) {
+        cube([10 + 2 * e, (10 + 3 * e) / 2, gpT * 4], center = true);
+    }
+    translate([35, 70, 0]) {
+        cube([10 + 2 * e, (10 + 3 * e) / 2, gpT * 4], center = true);
+    }
+    
+    bohrung(x = 35, y = 5 + 6.8,          d = 15 + e);
+    bohrung(x = 35, y = 70 - (5 + 6.8),   d = 15 + e);
+    
+    bohrung(x = 35, y = 35 - 14, d = 7.5 + 3 * e);
+    bohrung(x = 35, y = 35 + 14, d = 7.5 + 3 * e);
+    
+    bohrung(x = 35,         y = 35, d = 10.2 + 2 * e);
+    bohrung(x = 35 - 26,    y = 35, d = 10.2 + 2 * e);
+    
+    translate ([14, 14 ,-1]) {
+        cube([12, 13, 2 + 1]);
+        translate ([0, 29 , 0]) {
+            cube([12, 13, 2 + 1]);
+        }
+    }
+    
 }
 
 pin(pcX      , pcY);
@@ -154,7 +194,9 @@ module roehre ( x, y, z,
                 dickeWand,
                 basisDurchmesser,
                 basisHoehe,
-                gefuellt = false) {
+                gefuellt = false,
+                basis = true) {
+
     zentriert = true;
     translate([x, y, z]) {
         difference () {
@@ -162,8 +204,10 @@ module roehre ( x, y, z,
                 translate ([0, 0, hoehe / 2]) {
                     cylinder(h = hoehe, d = durchmesserAussen, center = zentriert);
                 }
-                translate ([0, 0, basisHoehe / 2]) {
-                    cylinder(h = basisHoehe, d = basisDurchmesser, center = zentriert);
+                if (basis) {
+                    translate ([0, 0, basisHoehe / 2]) {
+                        cylinder(h = basisHoehe, d = basisDurchmesser, center = zentriert);
+                    }
                 }
             }
             if (! gefuellt) {
@@ -174,8 +218,9 @@ module roehre ( x, y, z,
 }
 
 
+
 module roehreAussparung () {
-    translate ([0, rBasisD / 2, rBasisD / 2]) {
+    translate ([0, rBasisD / 2, rBasisD / 2 + rHoeheUnterkanteBasisDUeberGP]) {
     union () {
         linear_extrude (20) {
             projection () {
@@ -195,10 +240,14 @@ module roehreAussparung () {
 }
 }
 
-
 roehre (rBasisD / 2, gpH + rBasisD / 2 + 1 , 0,
         rH, rDAussen, rDickeWand, rBasisD, rBasisH,
-        gefuellt = false);
+        gefuellt = false, basis = false);
+
+//roehre (rBasisD * 1.5, gpH + rBasisD / 2 + 1 , 0,
+//        rH, rDAussen, rDickeWand, rBasisD, rBasisH,
+//        gefuellt = false);
+
 
 
 
@@ -207,7 +256,7 @@ roehre (rBasisD / 2, gpH + rBasisD / 2 + 1 , 0,
 module breakoutboard (breite, dicke, hoeheBisStecker, breiteFuge, x, y, z) {
     translate ([x, y, z]) {
     union () {
-        cube([breiteFuge, breite, hoeheBisStecker+mBreakoutboardSteckerBlockT]);
+        cube([dicke, breite, hoeheBisStecker+mBreakoutboardSteckerBlockT]);
         translate ([mBreakoutboardSteckerBlockOffsetX, 0, hoeheBisStecker]) {
             cube([mBreakoutboardSteckerBlockB, breite, mBreakoutboardSteckerBlockT]);
         }
@@ -227,13 +276,14 @@ difference () {
     
     cube([sbB, sbH, sbT]);
     
-    breakoutboard(bobVL6180XBreite, bobVL6180XDicke, bobVL6180XHoeheBisStecker, bobVL6180XBreiteFuge, bobVL6180XX, bobVL6180XY, bobVL6180XZ);
+    breakoutboard(bobVL6180XBreite, bobVL6180XDicke, bobVL6180XHoeheBisStecker, bobVL6180XTiefeFuge, bobVL6180XX, bobVL6180XY, bobVL6180XZ);
     
-    breakoutboard(bobBME280Breite, bobBME280Dicke, bobBME280HoeheBisStecker, bobBME280BreiteFuge, bobVME280X, bobVME280Y, bobVME280Z);    
+    breakoutboard(bobBME280Breite, bobBME280Dicke, bobBME280HoeheBisStecker, bobBME280TiefeFuge, bobVME280X, bobVME280Y, bobVME280Z);    
     
     translate ([bobVL6180XX - ( 1 + abs(mBreakoutboardSteckerBlockOffsetX)) ,
-                bobVL6180XY + (bobVL6180XBreite - rBasisD) / 2,
-                1]) {
+                bobVL6180XY + (bobVL6180XBreite - rBasisD) / 2 ,
+                1
+                ]) {
         roehreAussparung ();
         translate ([-rHalterungBasisH, rBasisD, 0]) {
             rotate ([180, 180, 0]) {
@@ -244,11 +294,17 @@ difference () {
     }
     
     // Materialeinsparungen:
-    translate([-1 , bobVME280Y, gpT]) {
-        cube([  bobVME280X + mBreakoutboardSteckerBlockOffsetX + 1.01,
-                bobBME280Breite + babAbstaendeInHalterung + 0.01,
-                sbT
+    translate([-1 , bobVME280Y - babAbstaendeInHalterung - e, -1]) {
+        cube([  bobVME280X + mBreakoutboardSteckerBlockOffsetX + 2.01,
+                bobBME280Breite + babAbstaendeInHalterung + 0.01 + e,
+                sbT * 2
             ]);
+        translate([8, 0, -1]) {
+            cube([  bobVME280X + mBreakoutboardSteckerBlockOffsetX + 3.01,
+                bobBME280Breite + babAbstaendeInHalterung + 0.01 + e,
+                sbT * 2
+            ]);
+        }
     }
     
 }

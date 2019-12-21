@@ -53,7 +53,7 @@ void os_getDevKey (u1_t* buf) { }
 
 static osjob_t sendjob;
 
-const unsigned TX_INTERVAL = 900; // in seconds
+const unsigned TX_INTERVAL = 180; // in seconds
 const int SLEEP_CYCLES = (int) (TX_INTERVAL / 8);
 
 
