@@ -14,3 +14,13 @@ A5    SCL / Takt             5 / SCL      3 / SCL      |   *
 VCC   Versorgungsspannung    2 / VIN      1 / VIN      *   *
 GND                          3 / GND      2 / GND
 ```
+
+```
+Adafruit Feather M0          VL6180X      BME280       Pull-Up-Widerstände
+-------------------          -------      ------       -------------------
+
+SDA    SDA / Daten           4 / SDA      4 / SDA      *
+SCL    SCL / Takt            5 / SCL      3 / SCL      |   *
+VCC   Versorgungsspannung    2 / VIN      1 / VIN      *   *
+GND                          3 / GND      2 / GND
+```
