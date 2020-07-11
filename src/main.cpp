@@ -11,7 +11,6 @@ https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/tt
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
-#include "LowPower.h"
 #include <VL6180X.h>
 
 
@@ -47,22 +46,31 @@ struct Measurement
 };
 
 
+// These callbacks are only used in over-the-air activation, so they are
+// left empty here (we cannot leave them out completely unless
+// DISABLE_JOIN is set in arduino-lmic/project_config/lmic_project_config.h,
+// otherwise the linker will complain).
 void os_getArtEui (u1_t* buf) { }
 void os_getDevEui (u1_t* buf) { }
 void os_getDevKey (u1_t* buf) { }
 
 static osjob_t sendjob;
 
-const unsigned TX_INTERVAL = 180; // in seconds
+const unsigned TX_INTERVAL = 5*60; // in seconds
 const int SLEEP_CYCLES = (int) (TX_INTERVAL / 8);
 
 
 // Pin mapping
+// Adapted for Feather M0 per p.10 of [feather]
+// Pin mapping for Adafruit Feather M0 LoRa
 const lmic_pinmap lmic_pins = {
-        .nss = 10, // ulm node 10
-        .rxtx = LMIC_UNUSED_PIN,
-        .rst = LMIC_UNUSED_PIN,
-        .dio = {4, 5, 6}, // TTN Ulm Minster node {4, 5 ,6}
+    .nss = 8,
+    .rxtx = LMIC_UNUSED_PIN,
+    .rst = 4,
+    .dio = {3, 6, LMIC_UNUSED_PIN},
+    .rxtx_rx_active = 0,
+    .rssi_cal = 8,              // LBT cal for the Adafruit Feather M0 LoRa, in dB
+    .spi_freq = 8000000,
 };
 
 void printValues() {
@@ -137,6 +145,7 @@ struct Measurement measureDistanceAndAmbientLight() {
     println(numberOfMeasurements);
 
     // calibrate sensor in terms of temperature
+    // disabled
     //sensor.writeReg(sensor.SYSRANGE__VHV_RECALIBRATE, 0x01);    
 
 
@@ -222,7 +231,7 @@ struct Measurement measureDistanceAndAmbientLight() {
 void do_send(osjob_t* j){
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
-      //println(F("OP_TXRXPEND, not sending"));
+      println(F("OP_TXRXPEND, not sending"));
     } else {
         // temp -> 2 byte
         // pressure -> 2 byte
@@ -283,13 +292,14 @@ void do_send(osjob_t* j){
 
         payload[15] = measurement.successfulMeasurementsAmbientLight;
 
-        int batteryVoltage = round(measureBatteryVoltage() * 100);
+        //int batteryVoltage = round(measureBatteryVoltage() * 100);
+        // temporary set battery voltage to zero
+        int batteryVoltage = 0;
         payload[16] = highByte(batteryVoltage);
         payload[17] = lowByte(batteryVoltage);
 
 
         LMIC_setTxData2(1, (uint8_t*)payload, sizeof(payload), 0);
-
         println(F("Pckt qd"));
     }
 }
@@ -297,35 +307,50 @@ void do_send(osjob_t* j){
 void onEvent (ev_t ev) {
     // print(os_getTime());
     // print(": ");
+    print(os_getTime());
+    println(": ");
     switch(ev) {
-        // case EV_SCAN_TIMEOUT:
-        //     println(F("EV_SCAN_TIMEOUT"));
-        //     break;
-        // case EV_BEACON_FOUND:
-        //     println(F("EV_BEACON_FOUND"));
-        //     break;
-        // case EV_BEACON_MISSED:
-        //     println(F("EV_BEACON_MISSED"));
-        //     break;
-        // case EV_BEACON_TRACKED:
-        //     println(F("EV_BEACON_TRACKED"));
-        //     break;
-        // case EV_JOINING:
-        //     println(F("EV_JOINING"));
-        //     break;
-        // case EV_JOINED:
-        //     println(F("EV_JOINED"));
-        //     break;
-        // case EV_RFU1:
-        //     println(F("EV_RFU1"));
-        //     break;
-        // case EV_JOIN_FAILED:
-        //     println(F("EV_JOIN_FAILED"));
-        //     break;
-        // case EV_REJOIN_FAILED:
-        //     println(F("EV_REJOIN_FAILED"));
-        //     break;
+        case EV_SCAN_TIMEOUT:
+            println(F("EV_SCAN_TIMEOUT"));
+            break;
+        case EV_BEACON_FOUND:
+            println(F("EV_BEACON_FOUND"));
+            break;
+        case EV_BEACON_MISSED:
+            println(F("EV_BEACON_MISSED"));
+            break;
+        case EV_BEACON_TRACKED:
+            println(F("EV_BEACON_TRACKED"));
+            break;
+        case EV_JOINING:
+            println(F("EV_JOINING"));
+            break;
+        case EV_JOINED:
+            println(F("EV_JOINED"));
+            break;
+        /*
+        || This event is defined but not used in the code. No
+        || point in wasting codespace on it.
+        ||
+        || case EV_RFU1:
+        ||     Serial.println(F("EV_RFU1"));
+        ||     break;
+        */
+        case EV_JOIN_FAILED:
+            println("EV_JOIN_FAILED");
+            break;
+        case EV_REJOIN_FAILED:
+            println("EV_REJOIN_FAILED");
+            break;
         case EV_TXCOMPLETE:
+            println("EV_TXCOMPLETE (includes waiting for RX windows)");
+            if (LMIC.txrxFlags & TXRX_ACK)
+              println("Received ack");
+            if (LMIC.dataLen) {
+              println("Received ");
+              println(LMIC.dataLen);
+              println(" bytes of payload");
+            }
             // println(F("EV_TXCOMPLETE"));
             // if (LMIC.txrxFlags & TXRX_ACK)
             //     println(F("Received ack"));
@@ -348,33 +373,54 @@ void onEvent (ev_t ev) {
             #endif
 
             // Going into sleep for more than 8 s – any better idea?
-            for(int i = 0; i < SLEEP_CYCLES; i++) {
-              LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
-            }
+            //for(int i = 0; i < SLEEP_CYCLES; i++) {
+            //  LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+            //}
 
             // Schedule next transmission to be immediately after this
-            os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(1), do_send);
+            os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
 
             break;
-        // case EV_LOST_TSYNC:
-        //     println(F("EV_LOST_TSYNC"));
-        //     break;
-        // case EV_RESET:
-        //     println(F("EV_RESET"));
-        //     break;
-        // case EV_RXCOMPLETE:
-        //     // data received in ping slot
-        //     println(F("EV_RXCOMPLETE"));
-        //     break;
-        // case EV_LINK_DEAD:
-        //     println(F("EV_LINK_DEAD"));
-        //     break;
-        // case EV_LINK_ALIVE:
-        //     println(F("EV_LINK_ALIVE"));
-        //     break;
-        // default:
-        //     println(F("Unknown event"));
-        //     break;
+        case EV_LOST_TSYNC:
+            println(F("EV_LOST_TSYNC"));
+            break;
+        case EV_RESET:
+            println(F("EV_RESET"));
+            break;
+        case EV_RXCOMPLETE:
+            // data received in ping slot
+            println(F("EV_RXCOMPLETE"));
+            break;
+        case EV_LINK_DEAD:
+            println(F("EV_LINK_DEAD"));
+            break;
+        case EV_LINK_ALIVE:
+            println(F("EV_LINK_ALIVE"));
+            break;
+        /*
+        || This event is defined but not used in the code. No
+        || point in wasting codespace on it.
+        ||
+        || case EV_SCAN_FOUND:
+        ||    Serial.println(F("EV_SCAN_FOUND"));
+        ||    break;
+        */
+        case EV_TXSTART:
+            println(F("EV_TXSTART"));
+            break;
+        case EV_TXCANCELED:
+            println(F("EV_TXCANCELED"));
+            break;
+        case EV_RXSTART:
+            /* do not print anything -- it wrecks timing */
+            break;
+        case EV_JOIN_TXCOMPLETE:
+            println(F("EV_JOIN_TXCOMPLETE: no JoinAccept"));
+            break;
+        default:
+            print(F("Unknown event: "));
+            println((unsigned) ev);
+            break;
     }
 }
 
