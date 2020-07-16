@@ -5,7 +5,7 @@ Copyright (c) 2015 Thomas Telkamp and Matthijs Kooijman
 https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/ttn-abp.ino
 */
 
-#include <lmic.h>
+#include "arduino_lmic.h"
 #include <hal/hal.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -16,7 +16,6 @@ https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/tt
 
 #include <Credentials.h> // TODO
 
-#define DEBUG // toggle serial output
 // #define SINGLE_VALUES
 const uint8_t numberOfMeasurements = 50; // max 255!
 
@@ -310,6 +309,7 @@ void onEvent (ev_t ev) {
     print(os_getTime());
     println(": ");
     switch(ev) {
+#ifndef MINSTER_NODE
         case EV_SCAN_TIMEOUT:
             println(F("EV_SCAN_TIMEOUT"));
             break;
@@ -342,15 +342,18 @@ void onEvent (ev_t ev) {
         case EV_REJOIN_FAILED:
             println("EV_REJOIN_FAILED");
             break;
+#endif
         case EV_TXCOMPLETE:
-            println("EV_TXCOMPLETE (includes waiting for RX windows)");
+            println("EV_TXCOMPLETE");
+#ifndef MINSTER_NODE
             if (LMIC.txrxFlags & TXRX_ACK)
-              println("Received ack");
+              println("Rcvd ack");
             if (LMIC.dataLen) {
               println("Received ");
               println(LMIC.dataLen);
               println(" bytes of payload");
             }
+#endif
             // println(F("EV_TXCOMPLETE"));
             // if (LMIC.txrxFlags & TXRX_ACK)
             //     println(F("Received ack"));
@@ -373,6 +376,7 @@ void onEvent (ev_t ev) {
             #endif
 
             // Going into sleep for more than 8 s – any better idea?
+            // disabled due to sensor vulnerability to voltage
             //for(int i = 0; i < SLEEP_CYCLES; i++) {
             //  LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
             //}
@@ -381,6 +385,7 @@ void onEvent (ev_t ev) {
             os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
 
             break;
+#ifndef MINSTER_NODE
         case EV_LOST_TSYNC:
             println(F("EV_LOST_TSYNC"));
             break;
@@ -421,6 +426,7 @@ void onEvent (ev_t ev) {
             print(F("Unknown event: "));
             println((unsigned) ev);
             break;
+#endif
     }
 }
 
@@ -428,7 +434,7 @@ void setup() {
     #ifdef DEBUG
       Serial.begin(9600);
     #endif
-    println(F("Starting"));
+    println(F("Strtng"));
 
 
     // Setup BME280, use address 0x77 (default) or 0x76
