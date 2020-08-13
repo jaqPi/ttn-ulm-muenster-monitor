@@ -60,7 +60,15 @@ const int SLEEP_CYCLES = (int) (TX_INTERVAL / 8);
 
 
 // Pin mapping
-// Adapted for Feather M0 per p.10 of [feather]
+#ifdef MINSTER_NODE
+// Pin mapping for Minster Node
+const lmic_pinmap lmic_pins = {
+        .nss = 10, // ulm node 10
+        .rxtx = LMIC_UNUSED_PIN,
+        .rst = LMIC_UNUSED_PIN,
+        .dio = {4, 5, 6}, // TTN Ulm Minster node {4, 5 ,6}
+};
+#elif FEATHER_M0
 // Pin mapping for Adafruit Feather M0 LoRa
 const lmic_pinmap lmic_pins = {
     .nss = 8,
@@ -71,6 +79,7 @@ const lmic_pinmap lmic_pins = {
     .rssi_cal = 8,              // LBT cal for the Adafruit Feather M0 LoRa, in dB
     .spi_freq = 8000000,
 };
+#endif
 
 void printValues() {
     // print("Temperature = ");
