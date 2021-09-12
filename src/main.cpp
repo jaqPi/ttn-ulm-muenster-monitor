@@ -12,6 +12,9 @@ https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/tt
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <VL6180X.h>
+#include "measurements.h"
+#include "sensors.h"
+#include <Statistics.h>
 
 
 #include <Credentials.h> // TODO
@@ -19,7 +22,9 @@ https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/tt
 // #define SINGLE_VALUES
 const uint8_t numberOfMeasurements = 50; // max 255!
 
-
+VL6180X sensorVL6180X;
+const SensorConfig configInterleaved = { INTERLEAVED, MANUAL, 30, 50, 500};
+const TofSensor tofSensor = TofSensor { sensorVL6180X, configInterleaved, 0, 0x29 };
 
 #ifdef DEBUG
   #define print(x) Serial.print(x);
@@ -30,28 +35,15 @@ const uint8_t numberOfMeasurements = 50; // max 255!
 #endif
 
 Adafruit_BME280 bme; // I2C, depending on your BME, you have to use address 0x77 (default) or 0x76, see below
-VL6180X sensor;
-
-
-struct Stats
-{
-    double mean, standardDeviation;
-};
-
-struct Measurement
-{
-    double meanDistance, standardDeviationDistance, meanAmbientLight, standardDeviationAmbientLight;
-    uint8_t successfulMeasurementsDistance, successfulMeasurementsAmbientLight;
-};
 
 
 // These callbacks are only used in over-the-air activation, so they are
 // left empty here (we cannot leave them out completely unless
 // DISABLE_JOIN is set in arduino-lmic/project_config/lmic_project_config.h,
 // otherwise the linker will complain).
-void os_getArtEui (u1_t* buf) { }
-void os_getDevEui (u1_t* buf) { }
-void os_getDevKey (u1_t* buf) { }
+void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
+void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
+void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
 
 static osjob_t sendjob;
 
@@ -106,136 +98,6 @@ float measureBatteryVoltage() {
     return measuredvbat;
 }
 
-double calcMean(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements]) {
-    double mean = 0.0;
-
-    if (successfulMeasurements > 0)
-    {
-        // Mean
-        for(uint8_t i = 0; i < successfulMeasurements; i++) {
-            mean += measurementSeries[i];
-        }
-        mean = mean/successfulMeasurements;
-    }
-
-    return mean;
-}
-
-double calcSD(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements], double mean) {
-    double standardDeviation = 0.0;
-    if (successfulMeasurements > 0)
-    {
-        double variance = 0.0;
-        // Variance
-        for(uint8_t i = 0; i < successfulMeasurements; i++) {
-            variance += sq(measurementSeries[i] - mean);
-        }
-        variance = variance/(successfulMeasurements-1);
-
-        // Standard deviation
-        standardDeviation = sqrt(variance);
-    }
-
-     return standardDeviation;
-}
-
-struct Stats calcStats(uint8_t successfulMeasurements, uint16_t measurementSeries[numberOfMeasurements]) {
-    double mean = calcMean(successfulMeasurements, measurementSeries);
-    return Stats { mean, calcSD(successfulMeasurements, measurementSeries, mean)};
-}
-
-
-struct Measurement measureDistanceAndAmbientLight() {
-    uint16_t measurementSeriesDistance[numberOfMeasurements];
-    uint16_t measurementSeriesAmbientLight[numberOfMeasurements];
-
-    print("Start ");
-    println(numberOfMeasurements);
-
-    // calibrate sensor in terms of temperature
-    // disabled
-    //sensor.writeReg(sensor.SYSRANGE__VHV_RECALIBRATE, 0x01);    
-
-
-    sensor.startInterleavedContinuous();
-    uint8_t successfulMeasurementsDistance = 0;
-    uint8_t successfulMeasurementsAmbientLight = 0;
-
-    for (uint8_t i = 0; i < numberOfMeasurements; i++) {
-        // Ambient Light
-        uint16_t currentAmbientLight = sensor.readAmbientContinuous();
-        if (!sensor.timeoutOccurred()) {
-            measurementSeriesAmbientLight[successfulMeasurementsAmbientLight] = currentAmbientLight;
-            successfulMeasurementsAmbientLight += 1;
-
-            #ifdef SINGLE_VALUES
-                // Print current value to Serial
-                if(i == numberOfMeasurements - 1) {
-                    println(currentAmbientLight);
-                }
-                else {
-                    print(currentAmbientLight);
-                    print(",");
-                }
-            #endif
-        }
-
-        // Distance
-        uint16_t currentDistance = (uint16_t) sensor.readRangeContinuous();
-        if (!sensor.timeoutOccurred()) {
-            measurementSeriesDistance[successfulMeasurementsDistance] = currentDistance;
-            successfulMeasurementsDistance += 1;
-
-            #ifdef SINGLE_VALUES
-                // Print current value to Serial
-                if(i == numberOfMeasurements - 1) {
-                    println(currentDistance);
-                }
-                else {
-                    print(currentDistance);
-                    print(",");
-                }
-            #endif
-        }
-    }
-    sensor.stopContinuous();
-
-    struct Stats statsAmbientLight = calcStats(successfulMeasurementsAmbientLight, measurementSeriesAmbientLight);
-    struct Stats statsDistance = calcStats(successfulMeasurementsDistance, measurementSeriesDistance);
-
-
-
-    // print("Distsucc: ");
-    // print(successfulMeasurementsDistance);
-    // print("/");
-    // print(numberOfMeasurements);
-    // println();
-    print("DistM:");
-    print(statsDistance.mean);
-    println();
-
-    print("DistSD:");
-    print(statsDistance.standardDeviation);
-    println();
-
-    print("ALSsuc:");
-    print(successfulMeasurementsAmbientLight);
-    print("/");
-    print(numberOfMeasurements);
-    println();
-    print("ALSM:");
-    print(statsAmbientLight.mean);
-    println();
-
-    print("ALSSD:");
-    print(statsAmbientLight.standardDeviation);
-    println();
-
-	struct Measurement measurement = { statsDistance.mean, statsDistance.standardDeviation, statsAmbientLight.mean, statsAmbientLight.standardDeviation, successfulMeasurementsDistance, successfulMeasurementsAmbientLight };
-
-    return measurement;
-}
-
 void do_send(osjob_t* j){
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
@@ -245,15 +107,17 @@ void do_send(osjob_t* j){
         // pressure -> 2 byte
         // humidity -> 2 byte
         // distance -> 2 byte
+        // distanceMedian -> 2 byte
         // distanceSD -> 2 byte
         // distanceSucc -> 1 byte
         // ambientLight -> 2 byte
+        // ambientLightMedian -> 2 byte
         // ambientLightSD -> 2 byte
         // ambietnLightSucc -> 1 byte
         // batteryVoltage -> 2 byte
 
-        // sum -> 18 byte
-        byte payload[18];
+        // sum -> 22 byte
+        byte payload[22];
 
         // Only needed in forced mode. Force update of BME values
         bme.takeForcedMeasurement();
@@ -277,34 +141,43 @@ void do_send(osjob_t* j){
         payload[4] = highByte(humidity);
         payload[5] = lowByte(humidity);
 
+        measurement_t currentMeasurement = measureDistanceAndAmbientLight(&tofSensor, numberOfMeasurements);
+
         // distance
-        Measurement measurement = measureDistanceAndAmbientLight();
-        int meanDistance = round(measurement.meanDistance * 100);
+        int meanDistance = round(currentMeasurement.distance.mean * 100);
         payload[6] = highByte(meanDistance);
         payload[7] = lowByte(meanDistance);
 
-        int standardDeviationDistance = round(measurement.standardDeviationDistance * 100);
+        int standardDeviationDistance = round(currentMeasurement.distance.standardDeviation * 100);
         payload[8] = highByte(standardDeviationDistance);
         payload[9] = lowByte(standardDeviationDistance);
 
-        payload[10] = measurement.successfulMeasurementsDistance;
+        int medianDistance = round(currentMeasurement.distance.median * 100);
+        payload[10] = highByte(medianDistance);
+        payload[11] = lowByte(medianDistance);
+
+        payload[12] = currentMeasurement.successfulMeasurementsDistance;
 
         // ambientLight
-        int meanAmbientLight = round(measurement.meanAmbientLight * 100);
-        payload[11] = highByte(meanAmbientLight);
-        payload[12] = lowByte(meanAmbientLight);
+        int meanAmbientLight = round(currentMeasurement.light.mean * 100);
+        payload[13] = highByte(meanAmbientLight);
+        payload[14] = lowByte(meanAmbientLight);
 
-        int standardDeviationAmbientLight = round(measurement.standardDeviationAmbientLight * 100);
-        payload[13] = highByte(standardDeviationAmbientLight);
-        payload[14] = lowByte(standardDeviationAmbientLight);
+        int standardDeviationAmbientLight = round(currentMeasurement.light.standardDeviation * 100);
+        payload[15] = highByte(standardDeviationAmbientLight);
+        payload[16] = lowByte(standardDeviationAmbientLight);
 
-        payload[15] = measurement.successfulMeasurementsAmbientLight;
+        int medianLight = round(currentMeasurement.light.median * 100);
+        payload[17] = highByte(medianLight);
+        payload[18] = lowByte(medianLight);
+
+        payload[19] = currentMeasurement.successfulMeasurementsAmbientLight;
 
         //int batteryVoltage = round(measureBatteryVoltage() * 100);
         // temporary set battery voltage to zero
         int batteryVoltage = 0;
-        payload[16] = highByte(batteryVoltage);
-        payload[17] = lowByte(batteryVoltage);
+        payload[20] = highByte(batteryVoltage);
+        payload[21] = lowByte(batteryVoltage);
 
 
         LMIC_setTxData2(1, (uint8_t*)payload, sizeof(payload), 0);
@@ -439,12 +312,45 @@ void onEvent (ev_t ev) {
     }
 }
 
+void scanI2C() {
+  println("I2C scanner. Scanning ...");
+  byte count = 0;
+
+
+  for (byte i = 1; i < 120; i++)
+  {
+
+    Wire.beginTransmission (i);
+    if (Wire.endTransmission () == 0)
+    {
+      print("Found address: ");
+      print(i);
+      print(" (0x");
+      print(i);
+      println(")");
+      count++;
+      delay (1);  // maybe unneeded?
+    } // end of good response
+  } // end of for loop
+  println("Done.");
+  print("Found ");
+  print(count);
+  println(" device(s).");
+}
+
 void setup() {
     #ifdef DEBUG
       Serial.begin(9600);
+      while(!Serial);
     #endif
     println(F("Strtng"));
+    Wire.begin();
+    delay(5000);
 
+    #ifdef DEBUG
+      scanI2C();
+    #endif
+    
 
     // Setup BME280, use address 0x77 (default) or 0x76
     if (!bme.begin(0x76)) {
@@ -463,51 +369,40 @@ void setup() {
                     Adafruit_BME280::SAMPLING_X1, // humidity
                     Adafruit_BME280::FILTER_OFF   );
 
-    // init tof sensor
-    sensor.init();
-    sensor.configureDefault();
-    sensor.setTimeout(500);
-    // stop continuous mode if already active
-    sensor.stopContinuous();
-    // in case stopContinuous() triggered a single-shot
-    // measurement, wait for it to complete
-    delay(300);
 
-    // disable auto calibrate (to do it manually before every series)
-    sensor.writeReg(sensor.SYSRANGE__VHV_REPEAT_RATE, 0x00);    
-    // calibrate single time (actually the sensor should have done it during start up)
-    sensor.writeReg(sensor.SYSRANGE__VHV_RECALIBRATE, 0x01);    
+      tofSensor.sensor.init();
+      tofSensor.sensor.configureDefault();
 
+      // Reduce range max convergence time and ALS integration
+      // time to 30 ms and 50 ms, respectively, to allow 10 Hz
+      // operation (as suggested by table "Interleaved mode
+      // limits (10 Hz operation)" in the datasheet).
+      tofSensor.sensor.writeReg(VL6180X::SYSRANGE__MAX_CONVERGENCE_TIME, tofSensor.config.rangeMaxConvergenceTime);
+      tofSensor.sensor.writeReg16Bit(VL6180X::SYSALS__INTEGRATION_PERIOD, tofSensor.config.alsMaxIntegrationPeriod);
+      tofSensor.sensor.setTimeout(tofSensor.config.timeout);
 
-    // LMIC init
+      // stop continuous mode if already active
+      tofSensor.sensor.stopContinuous();
+      // in case stopContinuous() triggered a single-shot
+      // measurement, wait for it to complete
+      delay(300);
+
+      if(tofSensor.config.calibrationMode == MANUAL) {
+        // disable auto calibrate (to do it manually before every series)
+        tofSensor.sensor.writeReg(VL6180X::SYSRANGE__VHV_REPEAT_RATE, 0x00);    
+        // calibrate single time (actually the sensor should have done it during start up)
+        tofSensor.sensor.writeReg(VL6180X::SYSRANGE__VHV_RECALIBRATE, 0x01);   
+      }
+
+      println(", configuration completed");
+
+     // LMIC init
     os_init();
     // Reset the MAC state. Session and pending data transfers will be discarded.
     LMIC_reset();
 
-#ifdef PROGMEM
-    uint8_t appskey[sizeof(APPSKEY)];
-    uint8_t nwkskey[sizeof(NWKSKEY)];
-    memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
-    memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
-    LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
-#else
-    // If not running an AVR with PROGMEM, just use the arrays directly
-    LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
-#endif
 
-#if defined(CFG_eu868)
-    LMIC_setupChannel(0, 868100000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
-    LMIC_setupChannel(1, 868300000, DR_RANGE_MAP(DR_SF12, DR_SF7B), BAND_CENTI);      // g-band
-    LMIC_setupChannel(2, 868500000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
-    LMIC_setupChannel(3, 867100000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
-    LMIC_setupChannel(4, 867300000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
-    LMIC_setupChannel(5, 867500000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
-    LMIC_setupChannel(6, 867700000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
-    LMIC_setupChannel(7, 867900000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
-    LMIC_setupChannel(8, 868800000, DR_RANGE_MAP(DR_FSK,  DR_FSK),  BAND_MILLI);      // g2-band
-#elif defined(CFG_us915)
-    LMIC_selectSubBand(1);
-#endif
+    LMIC_setClockError(MAX_CLOCK_ERROR * 20 / 100);
 
     // Disable link check validation
     LMIC_setLinkCheckMode(0);
@@ -515,7 +410,7 @@ void setup() {
     // TTN uses SF9 for its RX2 window.
     LMIC.dn2Dr = DR_SF9;
 
-    // Set data rate and transmit power for uplink (note: txpow seems to be ignored by the library)
+    // Set data rate and transmit power for uplink
     LMIC_setDrTxpow(DR_SF7,14);
 
     // Start job
