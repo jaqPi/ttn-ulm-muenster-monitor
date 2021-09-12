@@ -1,8 +1,11 @@
 /*
-Code is based on the the ABP example of the arduino-lmic library
+Code is based on the the OTAA example of the arduino-lmic library
+
+ * Copyright (c) 2015 Thomas Telkamp and Matthijs Kooijman
+ * Copyright (c) 2018 Terry Moore, MCCI
+
 which is licensed under the MIT license
-Copyright (c) 2015 Thomas Telkamp and Matthijs Kooijman
-https://github.com/matthijskooijman/arduino-lmic/blob/master/examples/ttn-abp/ttn-abp.ino
+https://github.com/mcci-catena/arduino-lmic/blob/master/examples/ttn-otaa/ttn-otaa.ino
 */
 
 #include "arduino_lmic.h"
