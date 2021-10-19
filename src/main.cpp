@@ -347,8 +347,15 @@ void setup() {
       while(!Serial);
     #endif
     println(F("Strtng"));
+
     Wire.begin();
     delay(5000);
+
+
+
+    // Switch off on board LED
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, LOW);
 
     #ifdef DEBUG
       scanI2C();
