@@ -1,6 +1,6 @@
 # Sensor/Node für's Münster-Monitoring
 
-Aktuell im Test, Messaufbau und ein paar Infos: https://wiki.verschwoerhaus.de/risssimulator16153
+Aktuell im Test, Messaufbau und ein paar Infos: https://wiki.temporaerhaus.de/risssimulator16153
 
 
 ## Pin-Belegung
